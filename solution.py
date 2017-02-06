@@ -13,6 +13,7 @@ boxes = cross(rows, cols)
 row_units = [cross(r, cols) for r in rows]
 column_units = [cross(rows, c) for c in cols]
 square_units = [cross(rs, cs) for rs in ('ABC','DEF','GHI') for cs in ('123','456','789')]
+# Constructing diagonals via list comprehension, then adding them to unitlist
 diagonals = [[rows[i] + cols[i] for i in range(len(cols))], [rows[i]+cols[-(i+1)] for i in range(len(cols))]]
 unitlist = row_units + column_units + square_units + diagonals
 assignments = []
@@ -48,7 +49,9 @@ def naked_twins(values):
     for unit in unitlist:
         unit_values = [''.join(sorted(v)) for b, v in values.items() if b in unit]
         for uv in unit_values:
-            # Supports any number of identical possible values per unit, not only twins
+            # Supports any number of identical possible values per unit, not only twins.
+            # For example, if one unit contains three values '123', or four values '1589' -- they will be processed
+            # by this function, and their values will be eliminated from the corresponding unit
             # TODO: Do not eliminate same value multiple times.
             if unit_values.count(uv) == len(uv) and len(uv) > 1:
                 values = eliminate_twins(uv, unit, values)
@@ -57,6 +60,7 @@ def naked_twins(values):
 
 def cross(A, B):
     return [a + b for a in A for b in B]
+
 
 def grid_values(grid):
     """
@@ -69,7 +73,9 @@ def grid_values(grid):
             Values: The value in each box, e.g., '8'. If the box has no value, then the value will be '123456789'.
     """
     default_value = '123456789'
+    # dict comprehension
     return {boxes[i]: grid[i] if grid[i] != '.' else default_value for i in range(len(grid))}
+
 
 def display(values):
     """
@@ -88,25 +94,32 @@ def display(values):
                       for c in cols))
         if r in 'CF': print(line)
 
+
 def eliminate(values):
     copy_values = copy(values)
     for box, value in values.items():
-        if len(value) == 1:
+        if len(value) == 1:  # Eliminate only single-digit values
             for unit in get_peers(box):
                 for peer in unit:
-                    if peer != box and len(copy_values[peer]) > 1:
+                    if peer != box and len(copy_values[peer]) > 1:  # Do NOT eliminate the last option. Possible for wrong solutions.
                         copy_values[peer] = copy_values[peer].replace(value, '')
     return copy_values
+
 
 def only_choice(values):
     copy_values = copy(values)
     for box, value in values.items():
         for unit in get_peers(box):
+            # Constructing a set of all unique individual values of peer's boxes, ignoring probed box
+            # For example, [23, 34, 45, 56, 67, 78, 2, 3, 4] -> {'2', '3', '4', '5', '6', '7', '8'}
             peers_unique_values = {uv for uv in ''.join([copy_values[b] for b in unit if box in unit and b != box])}
+            # If diff between values of current box and values of all his peers within the unit is 1 value,
+            # assigning it to the box
             residue = set(value) - peers_unique_values
             if len(residue) == 1:
                 copy_values[box] = list(residue)[0]
     return copy_values
+
 
 def reduce_puzzle(values):
     stalled = False
@@ -126,10 +139,15 @@ def reduce_puzzle(values):
             return False
     return values
 
+
 def get_peers(box):
     return [unit for unit in unitlist if box in unit]
 
+
 def find_min_boxes(values):
+    """
+    Return all boxes of min length (but greater than 1)
+    """
     min_boxes_length = len(cols)
     min_boxes = []
     for box, value in values.items():
@@ -140,11 +158,18 @@ def find_min_boxes(values):
             min_boxes.append(box)
     return min_boxes
 
+
 def is_solved(values):
+    """
+    :return: True if all values of all boxes have length = 1
+    """
     return values and all(len(v) == 1 for v in values.values())
 
+
 def search(values):
-    "Using depth-first search and propagation, create a search tree and solve the sudoku."
+    """
+    Using DFS to solve sudoku
+    """
     values = reduce_puzzle(values)
     if not values:
         return False
@@ -159,6 +184,7 @@ def search(values):
             return probe_values
     return False
 
+
 def solve(grid):
     """
     Find the solution to a Sudoku grid.
@@ -170,6 +196,7 @@ def solve(grid):
     """
     values = grid_values(grid)
     return search(values)
+
 
 if __name__ == '__main__':
     diag_sudoku_grid = '2.............62....1....7...6..8...3...9...7...6..4...4....8....52.............3'
